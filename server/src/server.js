@@ -14,12 +14,15 @@ const server = http.createServer(app); // Create an HTTP server from your expres
 // Initialize Socket.IO
 const io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173", // Allow your frontend to connect
-      methods: ["GET", "POST"]
+      origin: process.env.FRONTEND_URL || "http://localhost:5174", // Allow your frontend to connect
+      methods: ["GET", "POST", "PUT", "DELETE"] // Allow all necessary methods
     }
   });
 
-app.use(cors());
+app.use(cors({ 
+  origin: process.env.FRONTEND_URL || "http://localhost:5174", // Allow your frontend to connect
+  methods: ["GET", "POST", "PUT", "DELETE"] // Allow all necessary methods
+}));
 const PORT = process.env.PORT || 3000;
 
 // Middleware
@@ -77,8 +80,8 @@ io.on("connection", (socket) => {
       if (updatedDocument) {
         // Broadcast the changes to all other clients in the same document room
         // `socket.to(documentId).emit` sends to everyone in the room EXCEPT the sender
-        socket.to(documentId).emit("receive_changes", changes);
-        console.log(`Changes broadcasted for document ${documentId}`);
+        socket.to(documentId).emit("receive_changes", { changes, senderId: socket.id });
+        console.log(`Changes broadcasted for document ${documentId} from sender ${socket.id}`);
       }
     } catch (error) {
       console.error(`Error applying changes for document ${documentId}:`, error);
@@ -104,6 +107,9 @@ io.on("connection", (socket) => {
 
 // Start the server
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+
+
 
 
 

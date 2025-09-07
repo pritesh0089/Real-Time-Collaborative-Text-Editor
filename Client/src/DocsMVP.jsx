@@ -214,7 +214,12 @@ export default function DocsMVP({ documentId: propDocumentId, onBackToList }) {
       }
     });
 
-    s.on("receive_changes", (changes) => {
+    s.on("receive_changes", ({ changes, senderId }) => {
+      // CRITICAL: Ignore changes that originated from the current client.
+      if (s.id === senderId) {
+        return;
+      }
+
       // Naive update: replace entire document content
       // This can be improved with operational transforms to be more efficient
       // and preserve cursor position.
@@ -284,16 +289,25 @@ export default function DocsMVP({ documentId: propDocumentId, onBackToList }) {
 
   // Cloud autosave
   useEffect(() => {
-    if (!isDirty || isLoading) return;
+    console.log(`☁️ Autosave effect triggered. isDirty: ${isDirty}, isLoading: ${isLoading}`);
+
+    if (!isDirty || isLoading) {
+      console.log('☁️ Autosave condition not met, exiting.');
+      return;
+    }
     
+    console.log('☁️ Setting up autosave timer...');
     const id = setTimeout(async () => {
+      console.log('☁️ Timer fired! Attempting to save...');
       try {
         setSaveError(null);
         let savedDoc;
         
         if (documentId) {
+          console.log(`☁️ Calling updateDocument for ID: ${documentId}`);
           savedDoc = await documentService.updateDocument(documentId, title, value);
         } else {
+          console.log('☁️ Calling createDocument...');
           savedDoc = await documentService.createDocument(title, value);
           setDocumentId(savedDoc._id);
           if (socket) {
@@ -301,15 +315,19 @@ export default function DocsMVP({ documentId: propDocumentId, onBackToList }) {
           }
         }
         
+        console.log('☁️ Save successful! Server response:', savedDoc);
         setSavedAt(new Date(savedDoc.updatedAt));
         setIsDirty(false);
       } catch (error) {
+        console.error('❌ [CRITICAL] Autosave failed inside catch block:', error);
         setSaveError('Failed to save to cloud');
-        console.error('❌ Autosave failed:', error);
       }
     }, 600);
     
-    return () => clearTimeout(id);
+    return () => {
+      console.log('☁️ Cleanup: Clearing autosave timer.');
+      clearTimeout(id);
+    };
   }, [title, value, isDirty, documentId, isLoading, socket]);
 
 
@@ -394,14 +412,15 @@ export default function DocsMVP({ documentId: propDocumentId, onBackToList }) {
         key={documentId || 'new-document'}
         initialValue={editorValue}
         onChange={(v) => {
-          if (JSON.stringify(v) !== JSON.stringify(editor.children)) {
-            setValue(v);
-            setIsDirty(true);
-            if (socket && documentId) {
-              socket.emit("send_changes", { documentId, changes: v });
-            }
-          }
-        }}
+        console.log('📝 [Client] onChange event fired!');
+        // The conditional check was faulty and preventing saves.
+        // Removing it ensures that any change marks the document as dirty.
+        setValue(v);
+        setIsDirty(true);
+        if (socket && documentId) {
+          socket.emit("send_changes", { documentId, changes: v });
+        }
+      }}
       >
         {/* Toolbar */}
         <div className="bg-white border-b">

@@ -23,15 +23,25 @@ exports.getDocument = async (req, res) => {
 
 // Update document
 exports.updateDocument = async (req, res) => {
+  console.log('🔄 [Server] Attempting to update document:', req.params.id);
+  console.log('🔄 [Server] Incoming data:', req.body);
+
   try {
     const doc = await Document.findByIdAndUpdate(
       req.params.id,
       { ...req.body, updatedAt: Date.now() },
       { new: true, runValidators: true } // Added runValidators to ensure validation on updates
     );
-    if (!doc) return res.status(404).json({ error: "Not found" });
+
+    if (!doc) {
+      console.log('❌ [Server] Document not found for update:', req.params.id);
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    console.log('✅ [Server] Document updated successfully:', doc);
     res.json(doc);
   } catch (err) {
+    console.error('❌ [Server] Error updating document:', err);
     res.status(400).json({ error: err.message });
   }
 };
